@@ -5,7 +5,7 @@ import hashlib
 import smtplib
 from email.mime.text import MIMEText
 from cryptography.fernet import Fernet
-import base64  # ✅ FIX lỗi thiếu import
+import base64  # ✅ cần cho mã hóa/giải mã
 
 DATA_FILE = "data.json"
 
@@ -112,7 +112,7 @@ if not st.session_state.authenticated:
             recovery_email = data["master"]["email"]
             st.write(f"Nếu quên mật khẩu, mật khẩu sẽ gửi về email: {recovery_email}")
             if st.button("Gửi email khôi phục"):
-                # ⚠️ Ở đây demo, bạn cần thay thế bằng mật khẩu thật (chưa mã hóa)
+                # ⚠️ Demo: bạn cần thay bằng mật khẩu thật chưa mã hóa
                 send_recovery_email(recovery_email, data["master"]["username"], "[mật khẩu thật]")
                 st.success("Đã gửi email khôi phục!")
         else:
@@ -122,6 +122,16 @@ else:
     tab_func = st.tabs(["📂 Quản lý mật khẩu"])[0]
 
     with tab_func:
+        st.subheader(f"Xin chào, {st.session_state.master_username} 👋")
+
+        # ✅ Nút đăng xuất
+        if st.button("🚪 Đăng xuất"):
+            st.session_state.authenticated = False
+            st.session_state.master_username = ""
+            st.session_state.master_password = ""
+            st.success("Bạn đã đăng xuất.")
+            st.rerun()
+
         app_name = st.text_input("Tên App/Web")
         acc_username = st.text_input("Tên đăng nhập")
         acc_password = st.text_input("Mật khẩu")

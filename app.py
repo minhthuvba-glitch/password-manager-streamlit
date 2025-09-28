@@ -1,10 +1,20 @@
 import streamlit as st
 import json
 import os
+import base64
+import hashlib
+from cryptography.fernet import Fernet
 
 DATA_FILE = "data.json"
 
-# 📂 Hàm đọc dữ liệu từ file JSON
+# ✅ Khóa master cố định (bạn có thể đổi tùy ý)
+MASTER_KEY = "123456"
+
+# 🔑 Tạo key từ master password
+def generate_key(master_password: str) -> bytes:
+    return base64.urlsafe_b64encode(hashlib.sha256(master_password.encode()).digest())
+
+# 📂 Load dữ liệu JSON
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -12,13 +22,34 @@ def load_data():
     else:
         return {"accounts": []}
 
-# 💾 Hàm ghi dữ liệu vào file JSON
+# 💾 Lưu dữ liệu JSON
 def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
+# -------------------------
 st.set_page_config(page_title="Password Manager", page_icon="🔑")
-st.title("🔑 Password Manager (Demo)")
+st.title("🔑 Password Manager (Secure with Master Key)")
+
+# 🛡️ Đăng nhập bằng Master Key
+master_key_input = st.text_input("Nhập Master Key để đăng nhập", type="password")
+
+if master_key_input != MASTER_KEY:
+    st.warning("Bạn cần nhập đúng Master Key để sử dụng ứng dụng.")
+    st.stop()
+
+st.success("✅ Đăng nhập thành công!")
+
+# 🔑 Nhập master password để mã hóa/giải mã
+master_password = st.text_input("Nhập Master Password để mã hóa dữ liệu", type="password")
+
+if not master_password:
+    st.info("Vui lòng nhập Master Password để tiếp tục.")
+    st.stop()
+
+# Sinh key từ master password
+key = generate_key(master_password)
+cipher = Fernet(key)
 
 # Load dữ liệu
 data = load_data()
@@ -33,10 +64,11 @@ with st.form("add_account"):
 
     if submitted:
         if site and username and password:
+            encrypted_password = cipher.encrypt(password.encode()).decode()
             data["accounts"].append({
                 "site": site,
                 "username": username,
-                "password": password,
+                "password": encrypted_password,
                 "note": note
             })
             save_data(data)
@@ -44,7 +76,7 @@ with st.form("add_account"):
         else:
             st.error("❌ Vui lòng nhập đầy đủ Website, Username và Password!")
 
-# 📋 Hiển thị danh sách tài khoản
+# 📋 Hiển thị danh sách
 st.subheader("Danh sách tài khoản đã lưu")
 
 if len(data["accounts"]) == 0:
@@ -53,5 +85,12 @@ else:
     for i, acc in enumerate(data["accounts"], start=1):
         with st.expander(f"{i}. {acc['site']}"):
             st.write(f"👤 **Username:** {acc['username']}")
-            st.write(f"🔑 **Password:** {acc['password']}")
             st.write(f"📝 **Ghi chú:** {acc['note']}")
+
+            # Hiển mật khẩu khi nhấn nút
+            if st.button(f"Hiện mật khẩu #{i}"):
+                try:
+                    decrypted_password = cipher.decrypt(acc["password"].encode()).decode()
+                    st.code(decrypted_password)
+                except Exception:
+                    st.error("❌ Master Password không đúng hoặc dữ liệu bị lỗi!")

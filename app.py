@@ -72,85 +72,83 @@ if "reset_code" not in st.session_state:
     st.session_state.reset_code = None
 
 # ---------------------------
-# Tabs
+# Tab hiển thị
 # ---------------------------
-tab_login, tab_app = st.tabs(["🔑 Đăng nhập", "📒 Chức năng"])
+if not st.session_state.logged_in:
+    # Nếu chưa đăng nhập thì chỉ có tab Đăng nhập
+    tab_login, = st.tabs(["🔑 Đăng nhập"])
 
-# ---------------------------
-# Tab 1: Đăng nhập / Đăng ký / Quên mật khẩu
-# ---------------------------
-with tab_login:
-    st.subheader("Đăng nhập / Đăng ký")
+    with tab_login:
+        st.subheader("Đăng nhập / Đăng ký")
 
-    username = st.text_input("Tên đăng nhập")
-    password = st.text_input("Mật khẩu", type="password")
-    email = st.text_input("Email (chỉ khi Đăng ký hoặc Quên mật khẩu)")
+        username = st.text_input("Tên đăng nhập")
+        password = st.text_input("Mật khẩu", type="password")
+        email = st.text_input("Email (chỉ khi Đăng ký hoặc Quên mật khẩu)")
 
-    col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3)
 
-    with col1:
-        if st.button("Đăng nhập"):
-            if "master" in data and data["master"]:
-                if (
-                    username == data["master"]["username"]
-                    and hash_password(password) == data["master"]["password"]
-                ):
-                    st.session_state.logged_in = True
-                    st.success("Đăng nhập thành công!")
+        with col1:
+            if st.button("Đăng nhập"):
+                if "master" in data and data["master"]:
+                    if (
+                        username == data["master"]["username"]
+                        and hash_password(password) == data["master"]["password"]
+                    ):
+                        st.session_state.logged_in = True
+                        st.success("Đăng nhập thành công!")
+                        st.experimental_rerun()
+                    else:
+                        st.error("Sai tên đăng nhập hoặc mật khẩu.")
                 else:
-                    st.error("Sai tên đăng nhập hoặc mật khẩu.")
-            else:
-                st.warning("Chưa có tài khoản Master. Hãy Đăng ký.")
+                    st.warning("Chưa có tài khoản Master. Hãy Đăng ký.")
 
-    with col2:
-        if st.button("Đăng ký"):
-            if not data["master"]:
-                if username and password and email:
-                    data["master"] = {
-                        "username": username,
-                        "password": hash_password(password),
-                        "email": email,
-                    }
+        with col2:
+            if st.button("Đăng ký"):
+                if not data["master"]:
+                    if username and password and email:
+                        data["master"] = {
+                            "username": username,
+                            "password": hash_password(password),
+                            "email": email,
+                        }
+                        save_data(data)
+                        st.success("Đăng ký Master thành công! Vui lòng đăng nhập.")
+                    else:
+                        st.error("Vui lòng nhập đủ thông tin.")
+                else:
+                    st.warning("Tài khoản Master đã tồn tại. Không thể đăng ký mới.")
+
+        with col3:
+            if st.button("Quên mật khẩu"):
+                if "master" in data and data["master"]:
+                    reset_code = str(random.randint(100000, 999999))
+                    st.session_state.reset_code = reset_code
+                    try:
+                        send_reset_email(data["master"]["email"], reset_code)
+                        st.info("Mã khôi phục đã gửi về email!")
+                    except Exception as e:
+                        st.error(f"Lỗi gửi email: {e}")
+                else:
+                    st.error("Chưa có tài khoản Master để khôi phục.")
+
+        if st.session_state.reset_code:
+            st.subheader("Khôi phục mật khẩu")
+            code = st.text_input("Nhập mã khôi phục")
+            new_pass = st.text_input("Mật khẩu mới", type="password")
+            if st.button("Đặt lại mật khẩu"):
+                if code == st.session_state.reset_code:
+                    data["master"]["password"] = hash_password(new_pass)
                     save_data(data)
-                    st.success("Đăng ký Master thành công! Vui lòng đăng nhập.")
+                    st.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.")
+                    st.session_state.reset_code = None
                 else:
-                    st.error("Vui lòng nhập đủ thông tin.")
-            else:
-                st.warning("Tài khoản Master đã tồn tại. Không thể đăng ký mới.")
+                    st.error("Sai mã khôi phục.")
 
-    with col3:
-        if st.button("Quên mật khẩu"):
-            if "master" in data and data["master"]:
-                reset_code = str(random.randint(100000, 999999))
-                st.session_state.reset_code = reset_code
-                try:
-                    send_reset_email(data["master"]["email"], reset_code)
-                    st.info("Mã khôi phục đã gửi về email!")
-                except Exception as e:
-                    st.error(f"Lỗi gửi email: {e}")
-            else:
-                st.error("Chưa có tài khoản Master để khôi phục.")
+else:
+    # Nếu đã đăng nhập thì chỉ hiển thị tab chức năng
+    tab_app, = st.tabs(["📒 Chức năng"])
 
-    if st.session_state.reset_code:
-        st.subheader("Khôi phục mật khẩu")
-        code = st.text_input("Nhập mã khôi phục")
-        new_pass = st.text_input("Mật khẩu mới", type="password")
-        if st.button("Đặt lại mật khẩu"):
-            if code == st.session_state.reset_code:
-                data["master"]["password"] = hash_password(new_pass)
-                save_data(data)
-                st.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.")
-                st.session_state.reset_code = None
-            else:
-                st.error("Sai mã khôi phục.")
-
-# ---------------------------
-# Tab 2: Chức năng
-# ---------------------------
-with tab_app:
-    if not st.session_state.logged_in:
-        st.warning("⚠️ Vui lòng đăng nhập trước khi sử dụng chức năng.")
-    else:
+    with tab_app:
         st.subheader("Thêm tài khoản")
         with st.form("add_account"):
             service = st.text_input("App / Web")
@@ -173,3 +171,7 @@ with tab_app:
             with st.expander(f"{acc['service']} - {acc['username']}"):
                 st.write("Tên đăng nhập:", acc["username"])
                 st.write("Mật khẩu:", decrypt(acc["password"]))
+
+        if st.button("Đăng xuất"):
+            st.session_state.logged_in = False
+            st.experimental_rerun()

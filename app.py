@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 from cryptography.fernet import Fernet
 
 # ---------------------------
-# Hàm tiện ích
+# Tiện ích xử lý dữ liệu
 # ---------------------------
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
@@ -59,46 +59,38 @@ def decrypt(token: str) -> str:
     return fernet.decrypt(token.encode()).decode()
 
 # ---------------------------
-# Giao diện
+# Giao diện chính
 # ---------------------------
-st.title("🔐 Password Manager với Master Login")
+st.title("🔐 Password Manager")
 
 data = load_data()
 
-# Nếu chưa có master thì tạo mới
-if "master" not in data or not data["master"]:
-    st.subheader("Thiết lập tài khoản Master")
-    new_user = st.text_input("Tên đăng nhập")
-    new_pass = st.text_input("Mật khẩu", type="password")
-    new_email = st.text_input("Email khôi phục")
-    if st.button("Tạo Master"):
-        if new_user and new_pass and new_email:
-            data["master"] = {
-                "username": new_user,
-                "password": hash_password(new_pass),
-                "email": new_email
-            }
-            save_data(data)
-            st.success("Tạo Master thành công! Vui lòng đăng nhập.")
-        else:
-            st.error("Vui lòng nhập đủ thông tin.")
-else:
-    # ---------------------------
-    # Xử lý đăng nhập
-    # ---------------------------
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-    if "reset_code" not in st.session_state:
-        st.session_state.reset_code = None
+# Session state
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "reset_code" not in st.session_state:
+    st.session_state.reset_code = None
 
-    if not st.session_state.logged_in:
-        st.subheader("Đăng nhập Master")
-        username = st.text_input("Tên đăng nhập")
-        password = st.text_input("Mật khẩu", type="password")
+# ---------------------------
+# Tabs
+# ---------------------------
+tab_login, tab_app = st.tabs(["🔑 Đăng nhập", "📒 Chức năng"])
 
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Đăng nhập"):
+# ---------------------------
+# Tab 1: Đăng nhập / Đăng ký / Quên mật khẩu
+# ---------------------------
+with tab_login:
+    st.subheader("Đăng nhập / Đăng ký")
+
+    username = st.text_input("Tên đăng nhập")
+    password = st.text_input("Mật khẩu", type="password")
+    email = st.text_input("Email (chỉ khi Đăng ký hoặc Quên mật khẩu)")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("Đăng nhập"):
+            if "master" in data and data["master"]:
                 if (
                     username == data["master"]["username"]
                     and hash_password(password) == data["master"]["password"]
@@ -107,9 +99,28 @@ else:
                     st.success("Đăng nhập thành công!")
                 else:
                     st.error("Sai tên đăng nhập hoặc mật khẩu.")
+            else:
+                st.warning("Chưa có tài khoản Master. Hãy Đăng ký.")
 
-        with col2:
-            if st.button("Quên mật khẩu"):
+    with col2:
+        if st.button("Đăng ký"):
+            if not data["master"]:
+                if username and password and email:
+                    data["master"] = {
+                        "username": username,
+                        "password": hash_password(password),
+                        "email": email,
+                    }
+                    save_data(data)
+                    st.success("Đăng ký Master thành công! Vui lòng đăng nhập.")
+                else:
+                    st.error("Vui lòng nhập đủ thông tin.")
+            else:
+                st.warning("Tài khoản Master đã tồn tại. Không thể đăng ký mới.")
+
+    with col3:
+        if st.button("Quên mật khẩu"):
+            if "master" in data and data["master"]:
                 reset_code = str(random.randint(100000, 999999))
                 st.session_state.reset_code = reset_code
                 try:
@@ -117,41 +128,47 @@ else:
                     st.info("Mã khôi phục đã gửi về email!")
                 except Exception as e:
                     st.error(f"Lỗi gửi email: {e}")
+            else:
+                st.error("Chưa có tài khoản Master để khôi phục.")
 
-        if st.session_state.reset_code:
-            st.subheader("Khôi phục mật khẩu")
-            code = st.text_input("Nhập mã khôi phục")
-            new_pass = st.text_input("Mật khẩu mới", type="password")
-            if st.button("Đặt lại mật khẩu"):
-                if code == st.session_state.reset_code:
-                    data["master"]["password"] = hash_password(new_pass)
-                    save_data(data)
-                    st.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.")
-                    st.session_state.reset_code = None
-                else:
-                    st.error("Sai mã khôi phục.")
+    if st.session_state.reset_code:
+        st.subheader("Khôi phục mật khẩu")
+        code = st.text_input("Nhập mã khôi phục")
+        new_pass = st.text_input("Mật khẩu mới", type="password")
+        if st.button("Đặt lại mật khẩu"):
+            if code == st.session_state.reset_code:
+                data["master"]["password"] = hash_password(new_pass)
+                save_data(data)
+                st.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.")
+                st.session_state.reset_code = None
+            else:
+                st.error("Sai mã khôi phục.")
+
+# ---------------------------
+# Tab 2: Chức năng
+# ---------------------------
+with tab_app:
+    if not st.session_state.logged_in:
+        st.warning("⚠️ Vui lòng đăng nhập trước khi sử dụng chức năng.")
     else:
-        # ---------------------------
-        # Chức năng quản lý mật khẩu
-        # ---------------------------
-        st.subheader("Quản lý tài khoản")
-
-        # Thêm tài khoản
+        st.subheader("Thêm tài khoản")
         with st.form("add_account"):
-            service = st.text_input("Dịch vụ / Trang web")
+            service = st.text_input("App / Web")
             acc_user = st.text_input("Tên đăng nhập")
             acc_pass = st.text_input("Mật khẩu")
             submitted = st.form_submit_button("Lưu")
             if submitted:
-                enc_pass = encrypt(acc_pass)
-                data["accounts"].append(
-                    {"service": service, "username": acc_user, "password": enc_pass}
-                )
-                save_data(data)
-                st.success("Đã lưu tài khoản.")
+                if service and acc_user and acc_pass:
+                    enc_pass = encrypt(acc_pass)
+                    data["accounts"].append(
+                        {"service": service, "username": acc_user, "password": enc_pass}
+                    )
+                    save_data(data)
+                    st.success("Đã lưu tài khoản.")
+                else:
+                    st.error("Vui lòng nhập đầy đủ thông tin.")
 
-        # Hiển thị danh sách
-        st.write("### Danh sách tài khoản")
+        st.subheader("Danh sách tài khoản đã lưu")
         for idx, acc in enumerate(data["accounts"]):
             with st.expander(f"{acc['service']} - {acc['username']}"):
                 st.write("Tên đăng nhập:", acc["username"])
